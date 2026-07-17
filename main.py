@@ -22,6 +22,40 @@ class SeedancePlugin(Star):
         self.poll_interval = max(3, int(self.config.get("poll_interval", 5)))
         self.timeout = max(60, int(self.config.get("timeout", 900)))
 
+    def _profile_image_url(self) -> str:
+        """Return the first public image URL from the active persona."""
+        active_id = str(self.config.get("active_profile_id", "default")).strip()
+        profiles = self.config.get("profiles", [])
+        if isinstance(profiles, dict):
+            profiles = [dict(value, id=key) if isinstance(value, dict) else {} for key, value in profiles.items()]
+        if not isinstance(profiles, list):
+            return ""
+        for profile in profiles:
+            if not isinstance(profile, dict):
+                continue
+            profile_id = str(profile.get("id", profile.get("profile_id", ""))).strip()
+            if profile_id != active_id:
+                continue
+            refs = profile.get("persona_ref_image", profile.get("reference_images", []))
+            if isinstance(refs, str):
+                refs = [line.strip() for line in refs.splitlines() if line.strip()]
+            if isinstance(refs, list):
+                for ref in refs:
+                    if isinstance(ref, str) and ref.startswith(("http://", "https://")):
+                        return ref
+        return ""
+
+    def _profile_base_prompt(self) -> str:
+        active_id = str(self.config.get("active_profile_id", "default")).strip()
+        profiles = self.config.get("profiles", [])
+        if isinstance(profiles, dict):
+            profiles = [dict(value, id=key) if isinstance(value, dict) else {} for key, value in profiles.items()]
+        if isinstance(profiles, list):
+            for profile in profiles:
+                if isinstance(profile, dict) and str(profile.get("id", profile.get("profile_id", ""))).strip() == active_id:
+                    return str(profile.get("persona_base_prompt", "")).strip()
+        return ""
+
     @staticmethod
     def _read_local_key() -> str:
         """Use .key.txt only as a local development fallback."""
@@ -53,6 +87,9 @@ class SeedancePlugin(Star):
             prompt = prompt.replace("用seedence", "").replace("用seedance", "").strip(" ，,。")
         if not prompt:
             return "缺少视频提示词，请说明想让画面中的人物或物体做什么。"
+        persona_prompt = self._profile_base_prompt()
+        if persona_prompt:
+            prompt = f"{persona_prompt}\n动作与镜头要求：{prompt}"
         if not self.api_key:
             return "Seedance API Key 未配置。"
         duration = min(15, max(4, int(duration)))
@@ -65,7 +102,7 @@ class SeedancePlugin(Star):
             "generate_audio": bool(self.config.get("generate_audio", True)),
             "watermark": False,
         }
-        image_url = image_url or (self._extract_image_urls(event) or [""])[0]
+        image_url = image_url or (self._extract_image_urls(event) or [""])[0] or self._profile_image_url()
         if image_url:
             input_data["image_urls"] = [image_url]
         task_id = await self._create({"model": self.config.get("model", "seedance-2-0"), "input": input_data})
@@ -87,7 +124,8 @@ class SeedancePlugin(Star):
             return
 
         prompt, options = self._parse(text)
-        image_urls = options.get("image_urls") or message_images
+        persona_image = self._profile_image_url()
+        image_urls = options.get("image_urls") or message_images or ([persona_image] if persona_image else [])
         try:
             duration = min(15, max(4, int(options.get("duration", self.config.get("duration", 5)))))
         except (TypeError, ValueError):

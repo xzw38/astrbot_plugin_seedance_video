@@ -7,5 +7,7 @@
   "resolution": {"type": "string", "description": "默认清晰度：480p、720p、1080p 或 4k", "default": "720p"},
   "generate_audio": {"type": "bool", "description": "是否默认生成音频", "default": true},
   "poll_interval": {"type": "int", "description": "任务状态轮询间隔，单位秒", "default": 5},
-  "timeout": {"type": "int", "description": "单个任务最长等待时间，单位秒", "default": 900}
+  "timeout": {"type": "int", "description": "单个任务最长等待时间，单位秒", "default": 900},
+  "active_profile_id": {"type": "string", "description": "当前启用人设 ID，例如 default 或 persona_2", "default": "default"},
+  "profiles": {"type": "list", "description": "人设列表；每个人设包含 id、persona_name、persona_base_prompt、persona_ref_image。参考图请填写可公开访问的图片 URL。", "default": []}
 }
