@@ -106,9 +106,20 @@ class SeedancePlugin(Star):
         if image_url:
             input_data["image_urls"] = [image_url]
         task_id = await self._create({"model": self.config.get("model", "seedance-2-0"), "input": input_data})
-        result = await self._poll(task_id)
-        video_url = self._find_video_url(result)
-        return video_url or "任务完成，但 API 没有返回视频地址。"
+        asyncio.create_task(self._finish_tool_task(event, task_id))
+        return f"Seedance 视频任务已提交，任务 ID：{task_id}。生成完成后会自动发送视频，请稍候。"
+
+    async def _finish_tool_task(self, event: AstrMessageEvent, task_id: str) -> None:
+        try:
+            result = await self._poll(task_id)
+            video_url = self._find_video_url(result)
+            if video_url:
+                await event.send(event.chain_result([Video.fromURL(video_url)]))
+            else:
+                await event.send(event.plain_result("Seedance 任务完成，但没有返回视频地址。"))
+        except Exception as exc:
+            logger.exception("Seedance background tool task failed")
+            await event.send(event.plain_result(f"Seedance 视频生成失败：{exc}"))
 
     @filter.command("seedance")
     async def generate(self, event: AstrMessageEvent):
