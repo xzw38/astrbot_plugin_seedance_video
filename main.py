@@ -115,10 +115,14 @@ class SeedancePlugin(Star):
         persona_prompt = self._profile_base_prompt()
         if persona_prompt:
             prompt = f"{persona_prompt}\n动作与镜头要求：{prompt}"
+        logger.info("[Seedance Tool] final prompt=%s", prompt)
         if not self.api_key:
             return "Seedance API Key 未配置。"
-        image_url = image_url or (self._extract_image_urls(event) or [""])[0] or self._profile_image_url()
-        logger.info("[Seedance Tool] selected image=%s", bool(image_url))
+        extracted_images = self._extract_image_urls(event)
+        profile_image = self._profile_image_url()
+        image_source = "tool_parameter" if image_url else ("message_or_reply" if extracted_images else ("active_persona" if profile_image else "none"))
+        image_url = image_url or (extracted_images or [""])[0] or profile_image
+        logger.info("[Seedance Tool] selected image=%s source=%s url=%s", bool(image_url), image_source, image_url or "-")
         duration = min(15, max(4, int(duration)))
         input_data: dict[str, Any] = {
             "prompt": prompt,
@@ -133,6 +137,10 @@ class SeedancePlugin(Star):
         if image_url:
             input_data["image_urls"] = [image_url]
         selected_model = model or str(self.config.get("model", "seedance-2-0"))
+        logger.info(
+            "[Seedance Tool] request model=%s duration=%s aspect_ratio=%s resolution=%s audio=%s image_count=%s",
+            selected_model, duration, aspect_ratio, resolution, bool(generate_audio), len(input_data.get("image_urls", [])),
+        )
         task_id = await self._create({"model": selected_model, "input": input_data})
         logger.info("[Seedance Tool] submitted task_id=%s; background polling started", task_id)
         asyncio.create_task(self._finish_tool_task(event, task_id))
