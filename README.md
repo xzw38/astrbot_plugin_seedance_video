@@ -26,6 +26,16 @@ AstrBot 的 Seedance 2.0 视频生成插件。
 
 插件会自动把聊天图片作为首帧，使用提示词控制动作。若平台无法提供图片的公开 URL，可使用 `image=https://...` 手动指定公开图片地址。
 
+## 让 Bot 自动调用
+
+插件同时注册了 LLM Tool：`seedance_generate_video`。开启 AstrBot 的工具调用后，Bot 可以先调用 omnidraw 的生图或自拍工具，再把返回的图片 URL 传给 Seedance 工具生成视频。
+
+建议在 Bot 的系统提示词中加入：
+
+```text
+当用户要求“先生成图片/自拍，再做成视频”时，先调用图片生成工具；得到图片 URL 后，再调用 seedance_generate_video，并把图片 URL 作为 image_url 传入。
+```
+
 如果图片是刚刚由 AstrBot 或 omnidraw 生成的：直接回复那条图片，发送下面的命令即可，不需要复制图片地址：
 
 ```text

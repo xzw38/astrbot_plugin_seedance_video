@@ -34,6 +34,38 @@ class SeedancePlugin(Star):
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
 
+    @filter.llm_tool(name="seedance_generate_video")
+    async def seedance_generate_video(
+        self,
+        prompt: str,
+        image_url: str = "",
+        duration: int = 5,
+        aspect_ratio: str = "16:9",
+        resolution: str = "720p",
+    ) -> str:
+        """调用 Seedance 生成视频。
+
+        当用户想把一张图片、自拍或其他参考图制作成视频时调用。若上一步图片工具返回了图片 URL，必须传入 image_url。prompt 写视频中的动作、镜头和画面要求。没有图片时生成文生视频。
+        """
+        if not self.api_key:
+            return "Seedance API Key 未配置。"
+        duration = min(15, max(4, int(duration)))
+        input_data: dict[str, Any] = {
+            "prompt": prompt,
+            "generation_type": "image-to-video" if image_url else "text-to-video",
+            "duration": duration,
+            "aspect_ratio": aspect_ratio,
+            "resolution": resolution,
+            "generate_audio": bool(self.config.get("generate_audio", True)),
+            "watermark": False,
+        }
+        if image_url:
+            input_data["image_urls"] = [image_url]
+        task_id = await self._create({"model": self.config.get("model", "seedance-2-0"), "input": input_data})
+        result = await self._poll(task_id)
+        video_url = self._find_video_url(result)
+        return video_url or "任务完成，但 API 没有返回视频地址。"
+
     @filter.command("seedance")
     async def generate(self, event: AstrMessageEvent):
         """用法: /seedance 提示词 | 可选参数见 README。"""
