@@ -8,6 +8,41 @@
   "generate_audio": {"type": "bool", "description": "是否默认生成音频", "default": true},
   "poll_interval": {"type": "int", "description": "任务状态轮询间隔，单位秒", "default": 5},
   "timeout": {"type": "int", "description": "单个任务最长等待时间，单位秒", "default": 900},
-  "active_profile_id": {"type": "string", "description": "当前启用人设 ID，例如 default 或 persona_2", "default": "default"},
-  "profiles": {"type": "list", "description": "人设列表；每个人设包含 id、persona_name、persona_base_prompt、persona_ref_image。参考图请填写可公开访问的图片 URL。", "default": []}
+  "persona_config": {
+    "description": "多组人设与默认参考图",
+    "type": "object",
+    "hint": "配置好人设后，Bot 生成视频时会自动使用当前激活人设的参考图和基础描述。",
+    "items": {
+      "active_persona_id": {
+        "description": "当前启用人设 ID",
+        "type": "string",
+        "hint": "填写 profiles 中某个人设的 id，例如 default 或 persona_2。",
+        "default": "default"
+      },
+      "profiles": {
+        "description": "人设列表",
+        "type": "template_list",
+        "hint": "可添加多个人设。每个人设可以展开编辑，并配置多张参考图。",
+        "default": [{"__template_key": "persona", "id": "default", "persona_name": "默认人设", "persona_base_prompt": "", "persona_ref_image": []}],
+        "templates": {
+          "persona": {
+            "name": "人设",
+            "items": {
+              "id": {"description": "人设 ID", "type": "string", "hint": "建议使用英文、数字、下划线或短横线。", "default": "default"},
+              "persona_name": {"description": "人设名称", "type": "string", "hint": "显示名称，可使用中文。", "default": "默认人设"},
+              "persona_base_prompt": {"description": "人设基础描述", "type": "text", "hint": "长期固定的人物外貌、气质、服装习惯等描述。", "default": ""},
+              "persona_ref_image": {"description": "人设参考图组", "type": "list", "hint": "每行一个图片 URL。Seedance 需要能公开访问的图片地址。", "default": []}
+            }
+          }
+        }
+      },
+      "persona_ref_image": {
+        "description": "当前激活人设参考图上传入口",
+        "type": "file",
+        "hint": "上传后作为当前人设的默认参考图。",
+        "default": [],
+        "file_types": ["png", "jpg", "jpeg", "webp", "gif"]
+      }
+    }
+  }
 }

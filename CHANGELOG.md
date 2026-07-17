@@ -1,5 +1,11 @@
 # 更新日志
 
+## 1.1.0
+
+- 人设配置改为 AstrBot `template_list` 展开式界面。
+- 增加人设参考图上传入口和中文字段说明。
+- 兼容旧版扁平 profiles 配置。
+
 ## 1.0.9
 
 - 修复 AstrBot 视频组件方法名，使用 `Video.fromFileSystem` 上传本地视频。

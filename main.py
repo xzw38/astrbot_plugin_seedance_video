@@ -25,8 +25,9 @@ class SeedancePlugin(Star):
 
     def _profile_image_url(self) -> str:
         """Return the first public image URL from the active persona."""
-        active_id = str(self.config.get("active_profile_id", "default")).strip()
-        profiles = self.config.get("profiles", [])
+        persona_config = self.config.get("persona_config", self.config)
+        active_id = str(persona_config.get("active_persona_id", persona_config.get("active_profile_id", "default"))).strip()
+        profiles = persona_config.get("profiles", [])
         if isinstance(profiles, dict):
             profiles = [dict(value, id=key) if isinstance(value, dict) else {} for key, value in profiles.items()]
         if not isinstance(profiles, list):
@@ -47,8 +48,9 @@ class SeedancePlugin(Star):
         return ""
 
     def _profile_base_prompt(self) -> str:
-        active_id = str(self.config.get("active_profile_id", "default")).strip()
-        profiles = self.config.get("profiles", [])
+        persona_config = self.config.get("persona_config", self.config)
+        active_id = str(persona_config.get("active_persona_id", persona_config.get("active_profile_id", "default"))).strip()
+        profiles = persona_config.get("profiles", [])
         if isinstance(profiles, dict):
             profiles = [dict(value, id=key) if isinstance(value, dict) else {} for key, value in profiles.items()]
         if isinstance(profiles, list):
