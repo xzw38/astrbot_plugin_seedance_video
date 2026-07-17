@@ -17,6 +17,7 @@ from astrbot.api.star import Context, Star, register
 class SeedancePlugin(Star):
     def __init__(self, context: Context, config: dict[str, Any] | None = None):
         super().__init__(context)
+        self.context = context
         self.config = config or {}
         self.api_key = str(self.config.get("api_key", "")).strip() or self._read_local_key()
         self.base_url = str(self.config.get("base_url", "https://api.seedance2.ai")).rstrip("/")
@@ -25,6 +26,44 @@ class SeedancePlugin(Star):
         self.video_retention_days = max(0, int(self.config.get("video_retention_days", 3)))
         self.video_cache_dir = Path(__file__).with_name("video_cache")
         self._cleanup_video_cache()
+
+    async def _optimize_prompt(self, prompt: str, image_url: str = "") -> str:
+        if not bool(self.config.get("enable_prompt_optimizer", False)):
+            return prompt
+        try:
+            provider = self.context.get_using_provider()
+            if provider is None:
+                logger.warning("[Seedance Optimizer] no active AstrBot text provider; using original prompt")
+                return prompt
+            provider_id = provider.meta().id
+            reference_rule = (
+                "If a reference image is provided, use it only for the character identity and appearance; "
+                "invent the background, setting, lighting, composition, and camera from the user request.\n"
+                if image_url else ""
+            )
+            system_prompt = str(self.config.get("optimizer_system_prompt", "")).strip() or (
+                "你是专业的视频导演和提示词编剧。把用户的简短要求扩写成一段完整的视频生成提示词， "
+                "包含场景、人物动作、镜头运动、时间节奏、光线和画面风格。只输出最终提示词，不要解释过程， "
+                "不要输出 JSON，不要改变用户的核心意图。\n" + reference_rule
+            )
+            logger.info("[Seedance Optimizer] start provider=%s image=%s raw_prompt=%s", provider_id, bool(image_url), prompt)
+            result = await asyncio.wait_for(
+                self.context.llm_generate(
+                    chat_provider_id=provider_id,
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                    max_tokens=1800,
+                    temperature=0.7,
+                ),
+                timeout=max(10, int(self.config.get("optimizer_timeout", 45))),
+            )
+            optimized = str(getattr(result, "completion_text", "") or "").strip()
+            if optimized:
+                logger.info("[Seedance Optimizer] success optimized_prompt=%s", optimized)
+                return optimized
+        except Exception as exc:
+            logger.warning("[Seedance Optimizer] fallback to original prompt: %s", exc)
+        return prompt
 
     def _cleanup_video_cache(self) -> None:
         if self.video_retention_days <= 0:
@@ -131,6 +170,7 @@ class SeedancePlugin(Star):
         image_source = "tool_parameter" if image_url else ("message_or_reply" if extracted_images else ("active_persona" if profile_image else "none"))
         image_url = image_url or (extracted_images or [""])[0] or profile_image
         logger.info("[Seedance Tool] selected image=%s source=%s url=%s", bool(image_url), image_source, image_url or "-")
+        prompt = await self._optimize_prompt(prompt, image_url)
         if image_url and character_only:
             prompt = (
                 "Use the reference image only for the character identity and appearance. "
