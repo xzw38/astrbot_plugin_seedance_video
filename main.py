@@ -147,7 +147,7 @@ class SeedancePlugin(Star):
     async def seedance_generate_video(
         self,
         event: AstrMessageEvent,
-        prompt: str = "",
+        prompt: str,
         image_url: str = "",
         duration: int | None = None,
         aspect_ratio: str = "",
@@ -157,7 +157,11 @@ class SeedancePlugin(Star):
     ) -> str:
         """调用 Seedance 生成视频。
 
-        当用户想把一张图片、自拍或其他参考图制作成视频时调用。若上一步图片工具返回了图片 URL，必须传入 image_url。prompt 写视频中的动作、镜头和画面要求。没有图片时生成文生视频。
+        当用户想把一张图片、自拍或其他参考图制作成视频时调用。prompt 必须填写用户想让画面发生的动作和场景，不能留空。
+        如果用户要求“先自拍再生成视频”，必须先调用 OmniDraw 的 generate_selfie，且传入 return_result=true；
+        从返回 JSON 的 images 列表取出图片 URL，再把该 URL 传入本工具的 image_url。不要只依赖默认人设图。
+        image_url 应是可公开访问的图片 URL，Seedance 会把它作为 image-to-video 的第一帧。
+        没有图片时才生成 text-to-video。
         """
         logger.info(
             "[Seedance Tool] start prompt=%s image_url=%s duration=%s aspect_ratio=%s resolution=%s",
