@@ -9,6 +9,8 @@
   "poll_interval": {"type": "int", "description": "任务状态轮询间隔，单位秒", "default": 5},
   "timeout": {"type": "int", "description": "单个任务最长等待时间，单位秒", "default": 900},
   "video_retention_days": {"type": "int", "description": "本地视频缓存保留天数，默认 3 天；设为 0 表示不自动清理", "default": 3},
+  "enable_picgo_upload": {"type": "bool", "description": "OmniDraw 返回 Base64 图片时，是否自动调用本机 PicGo Server 上传为公网 URL", "default": true},
+  "picgo_server_url": {"type": "string", "description": "PicGo Server 上传地址，默认 http://127.0.0.1:36677/upload；请先在 PicGo 中启用 Server", "default": "http://127.0.0.1:36677/upload"},
   "character_reference_only": {"type": "bool", "description": "参考图仅用于人物外观，不参考背景、构图和环境", "default": true},
   "motion_style": {"type": "string", "description": "运镜与动作风格：stable=稳定连续（推荐）、normal=自然、dynamic=动态；默认 stable，减少僵硬和跳场景", "default": "stable"},
   "advanced_prompt": {"type": "text", "description": "高级提示词或剧本前缀，会和用户动作提示词合并", "default": ""},

@@ -1,6 +1,7 @@
 """AstrBot plugin for Seedance 2.0 asynchronous video generation."""
 
 import asyncio
+import base64
 import json
 import re
 import tempfile
@@ -204,6 +205,12 @@ class SeedancePlugin(Star):
         profile_image = self._profile_image_url()
         image_source = "tool_parameter" if image_url else ("message_or_reply" if extracted_images else ("active_persona" if profile_image else "none"))
         image_url = image_url or (extracted_images or [""])[0] or profile_image
+        if image_url.startswith("data:image/"):
+            uploaded_image_url = await self._upload_data_image_with_picgo(image_url)
+            if not uploaded_image_url:
+                return "OmniDraw 图片是 Base64 格式，PicGo 上传失败。请确认 PicGo Server 已启用并监听 127.0.0.1:36677。"
+            image_url = uploaded_image_url
+            image_source = "picgo"
         logger.info("[Seedance Tool] selected image=%s source=%s url=%s", bool(image_url), image_source, image_url or "-")
         prompt = await self._optimize_prompt(prompt, image_url)
         if image_url and character_only:
@@ -280,6 +287,49 @@ class SeedancePlugin(Star):
         except Exception as exc:
             logger.warning("[Seedance Download] exception=%s url=%s", exc, video_url)
             return ""
+
+    async def _upload_data_image_with_picgo(self, data_url: str) -> str:
+        """Turn OmniDraw's data URL into a public URL through PicGo Server."""
+        if not bool(self.config.get("enable_picgo_upload", True)):
+            return ""
+        if not data_url.startswith("data:image/") or "," not in data_url:
+            return ""
+        temp_path = ""
+        try:
+            header, encoded = data_url.split(",", 1)
+            mime = header[5:].split(";", 1)[0].lower()
+            extension = {"image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif"}.get(mime, ".png")
+            content = base64.b64decode(encoded, validate=False)
+            if not content:
+                raise ValueError("data:image 内容为空")
+            self.video_cache_dir.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(prefix="seedance_input_", suffix=extension, dir=self.video_cache_dir, delete=False) as output:
+                output.write(content)
+                temp_path = output.name
+            endpoint = str(self.config.get("picgo_server_url", "http://127.0.0.1:36677/upload")).strip()
+            logger.info("[Seedance PicGo] uploading data image bytes=%s endpoint=%s", len(content), endpoint)
+            timeout = aiohttp.ClientTimeout(total=60)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(endpoint, json={"list": [temp_path]}) as response:
+                    payload = await response.json(content_type=None)
+                    if response.status >= 400:
+                        raise RuntimeError(f"HTTP {response.status}: {payload}")
+            urls = payload.get("result") if isinstance(payload, dict) else None
+            if isinstance(urls, str):
+                urls = [urls]
+            if not isinstance(urls, list) or not urls or not isinstance(urls[0], str) or not urls[0].startswith("http"):
+                raise RuntimeError(f"PicGo 返回中没有公网 URL: {payload}")
+            logger.info("[Seedance PicGo] upload success url=%s", urls[0])
+            return urls[0]
+        except Exception as exc:
+            logger.warning("[Seedance PicGo] upload failed: %s", exc)
+            return ""
+        finally:
+            if temp_path:
+                try:
+                    Path(temp_path).unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     @filter.command("seedance")
     async def generate(self, event: AstrMessageEvent):
