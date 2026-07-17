@@ -1,5 +1,9 @@
 # 更新日志
 
+## 1.0.9
+
+- 修复 AstrBot 视频组件方法名，使用 `Video.fromFileSystem` 上传本地视频。
+
 ## 1.0.8
 
 - 发送视频前先下载到本地，兼容 Kook 无法直接读取 Seedance CDN 视频地址的问题。

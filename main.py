@@ -128,7 +128,7 @@ class SeedancePlugin(Star):
                 local_file = await self._download_video(video_url)
                 try:
                     if local_file:
-                        await event.send(event.chain_result([Video.fromFile(local_file)]))
+                        await event.send(event.chain_result([Video.fromFileSystem(local_file)]))
                         logger.info("[Seedance Background] local video sent task_id=%s file=%s", task_id, local_file)
                     else:
                         await event.send(event.chain_result([Video.fromURL(video_url)]))
