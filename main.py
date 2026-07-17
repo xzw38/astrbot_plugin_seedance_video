@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -143,11 +144,22 @@ class SeedancePlugin(Star):
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
 
+    @staticmethod
+    def _fallback_video_prompt(message: str) -> str:
+        """Recover the action when an LLM calls the tool with an empty argument object."""
+        text = str(message or "").strip()
+        for marker in ("再让", "然后让", "接着让", "之后让"):
+            if marker in text:
+                text = text.split(marker, 1)[1].strip()
+                break
+        text = re.sub(r"^(用?seedance|生成视频|做成视频|拍成视频)\s*", "", text, flags=re.IGNORECASE)
+        return text.strip(" ，,。！？!?\t\r\n")
+
     @filter.llm_tool(name="seedance_generate_video")
     async def seedance_generate_video(
         self,
         event: AstrMessageEvent,
-        prompt: str,
+        prompt: str = "",
         image_url: str = "",
         duration: int | None = None,
         aspect_ratio: str = "",
@@ -157,7 +169,8 @@ class SeedancePlugin(Star):
     ) -> str:
         """调用 Seedance 生成视频。
 
-        当用户想把一张图片、自拍或其他参考图制作成视频时调用。prompt 必须填写用户想让画面发生的动作和场景，不能留空。
+        当用户想把一张图片、自拍或其他参考图制作成视频时调用。prompt 应填写用户想让画面发生的动作和场景。
+        如果模型漏传 prompt，插件会从当前消息中恢复动作，避免空参数直接报错。
         如果用户要求“先自拍再生成视频”，必须先调用 OmniDraw 的 generate_selfie，且传入 return_result=true；
         从返回 JSON 的 images 列表取出图片 URL，再把该 URL 传入本工具的 image_url。不要只依赖默认人设图。
         image_url 应是可公开访问的图片 URL，Seedance 会把它作为 image-to-video 的第一帧。
@@ -173,8 +186,9 @@ class SeedancePlugin(Star):
         generate_audio = bool(self.config.get("generate_audio", True)) if generate_audio is None else bool(generate_audio)
         logger.info("[Seedance Tool] effective settings duration=%s resolution=%s aspect_ratio=%s audio=%s", duration, resolution, aspect_ratio, generate_audio)
         if not isinstance(prompt, str) or not prompt.strip():
-            prompt = getattr(event, "message_str", "") or ""
-            prompt = prompt.replace("用seedence", "").replace("用seedance", "").strip(" ，,。")
+            raw_message = getattr(event, "message_str", "") or ""
+            prompt = self._fallback_video_prompt(raw_message)
+            logger.warning("[Seedance Tool] empty prompt from LLM; recovered prompt from event=%s", prompt)
         if not prompt:
             return "缺少视频提示词，请说明想让画面中的人物或物体做什么。"
         persona_prompt = self._profile_base_prompt()
