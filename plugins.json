@@ -4,7 +4,7 @@
     "display_name": "Seedance Video Generation",
     "desc": "Seedance 2.0 text-to-video, image-to-video, and async polling plugin.",
     "repo": "https://github.com/xzw38/astrbot_plugin_seedance_video",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "author": "astrbotvideogenerate",
     "support_platforms": ["aiocqhttp", "telegram", "discord"]
   }

@@ -37,6 +37,7 @@ class SeedancePlugin(Star):
     @filter.llm_tool(name="seedance_generate_video")
     async def seedance_generate_video(
         self,
+        event: AstrMessageEvent,
         prompt: str,
         image_url: str = "",
         duration: int = 5,
@@ -47,6 +48,8 @@ class SeedancePlugin(Star):
 
         当用户想把一张图片、自拍或其他参考图制作成视频时调用。若上一步图片工具返回了图片 URL，必须传入 image_url。prompt 写视频中的动作、镜头和画面要求。没有图片时生成文生视频。
         """
+        if not isinstance(prompt, str) or not prompt.strip():
+            return "缺少视频提示词，请说明想让画面中的人物或物体做什么。"
         if not self.api_key:
             return "Seedance API Key 未配置。"
         duration = min(15, max(4, int(duration)))
