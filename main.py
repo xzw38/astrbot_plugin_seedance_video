@@ -115,6 +115,8 @@ class SeedancePlugin(Star):
             prompt = f"{persona_prompt}\n动作与镜头要求：{prompt}"
         if not self.api_key:
             return "Seedance API Key 未配置。"
+        image_url = image_url or (self._extract_image_urls(event) or [""])[0] or self._profile_image_url()
+        logger.info("[Seedance Tool] selected image=%s", bool(image_url))
         duration = min(15, max(4, int(duration)))
         input_data: dict[str, Any] = {
             "prompt": prompt,
@@ -125,7 +127,6 @@ class SeedancePlugin(Star):
             "generate_audio": bool(self.config.get("generate_audio", True)),
             "watermark": False,
         }
-        image_url = image_url or (self._extract_image_urls(event) or [""])[0] or self._profile_image_url()
         logger.info("[Seedance Tool] input mode=%s profile_image=%s", "image-to-video" if image_url else "text-to-video", bool(image_url))
         if image_url:
             input_data["image_urls"] = [image_url]
@@ -273,7 +274,14 @@ class SeedancePlugin(Star):
                 if child is not None:
                     walk(child, depth + 1)
 
+        get_messages = getattr(event, "get_messages", None)
+        if callable(get_messages):
+            try:
+                walk(get_messages())
+            except Exception as exc:
+                logger.debug("[Seedance Image] get_messages failed: %s", exc)
         walk(getattr(event, "message_obj", None))
+        logger.info("[Seedance Image] detected public image URLs=%s", len(urls))
         return urls
 
     async def _create(self, payload: dict[str, Any]) -> str:
