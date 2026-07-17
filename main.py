@@ -82,6 +82,10 @@ class SeedancePlugin(Star):
 
         当用户想把一张图片、自拍或其他参考图制作成视频时调用。若上一步图片工具返回了图片 URL，必须传入 image_url。prompt 写视频中的动作、镜头和画面要求。没有图片时生成文生视频。
         """
+        logger.info(
+            "[Seedance Tool] start prompt=%s image_url=%s duration=%s aspect_ratio=%s resolution=%s",
+            bool(prompt), bool(image_url), duration, aspect_ratio, resolution,
+        )
         if not isinstance(prompt, str) or not prompt.strip():
             prompt = getattr(event, "message_str", "") or ""
             prompt = prompt.replace("用seedence", "").replace("用seedance", "").strip(" ，,。")
@@ -103,22 +107,31 @@ class SeedancePlugin(Star):
             "watermark": False,
         }
         image_url = image_url or (self._extract_image_urls(event) or [""])[0] or self._profile_image_url()
+        logger.info("[Seedance Tool] input mode=%s profile_image=%s", "image-to-video" if image_url else "text-to-video", bool(image_url))
         if image_url:
             input_data["image_urls"] = [image_url]
         task_id = await self._create({"model": self.config.get("model", "seedance-2-0"), "input": input_data})
+        logger.info("[Seedance Tool] submitted task_id=%s; background polling started", task_id)
         asyncio.create_task(self._finish_tool_task(event, task_id))
         return f"Seedance 视频任务已提交，任务 ID：{task_id}。生成完成后会自动发送视频，请稍候。"
 
     async def _finish_tool_task(self, event: AstrMessageEvent, task_id: str) -> None:
+        started = asyncio.get_running_loop().time()
         try:
+            logger.info("[Seedance Background] polling started task_id=%s", task_id)
             result = await self._poll(task_id)
+            elapsed = asyncio.get_running_loop().time() - started
             video_url = self._find_video_url(result)
+            logger.info("[Seedance Background] completed task_id=%s elapsed=%.1fs video_url=%s", task_id, elapsed, bool(video_url))
             if video_url:
                 await event.send(event.chain_result([Video.fromURL(video_url)]))
+                logger.info("[Seedance Background] result sent task_id=%s", task_id)
             else:
                 await event.send(event.plain_result("Seedance 任务完成，但没有返回视频地址。"))
+                logger.error("[Seedance Background] completed without video URL task_id=%s payload=%s", task_id, result)
         except Exception as exc:
             logger.exception("Seedance background tool task failed")
+            logger.error("[Seedance Background] failed task_id=%s error=%s", task_id, exc)
             await event.send(event.plain_result(f"Seedance 视频生成失败：{exc}"))
 
     @filter.command("seedance")
@@ -219,31 +232,40 @@ class SeedancePlugin(Star):
         return urls
 
     async def _create(self, payload: dict[str, Any]) -> str:
+        logger.info("[Seedance API] POST /v1/videos/generations model=%s mode=%s", payload.get("model"), payload.get("input", {}).get("generation_type"))
         timeout = aiohttp.ClientTimeout(total=60)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.post(f"{self.base_url}/v1/videos/generations", headers=self._headers(), json=payload) as response:
                 data = await response.json(content_type=None)
                 if response.status >= 400:
+                    logger.error("[Seedance API] create failed status=%s response=%s", response.status, data)
                     raise RuntimeError(self._error(data, response.status))
                 nested = data.get("data", {}) if isinstance(data.get("data", {}), dict) else {}
                 task_id = data.get("id") or data.get("task_id") or data.get("taskId") or nested.get("id") or nested.get("taskId")
                 if not task_id:
+                    logger.error("[Seedance API] create response missing task id payload=%s", data)
                     raise RuntimeError(f"API 未返回任务 ID：{data}")
+                logger.info("[Seedance API] create success task_id=%s", task_id)
                 return str(task_id)
 
     async def _poll(self, task_id: str) -> dict[str, Any]:
         timeout = aiohttp.ClientTimeout(total=60)
         elapsed = 0
+        attempt = 0
         async with aiohttp.ClientSession(timeout=timeout) as session:
             while elapsed < self.timeout:
+                attempt += 1
                 async with session.get(f"{self.base_url}/v1/tasks/{task_id}", headers=self._headers()) as response:
                     data = await response.json(content_type=None)
                     if response.status >= 400:
+                        logger.error("[Seedance API] poll failed task_id=%s status=%s response=%s", task_id, response.status, data)
                         raise RuntimeError(self._error(data, response.status))
                 status = str(data.get("status") or data.get("data", {}).get("status", "")).lower()
+                logger.info("[Seedance API] poll task_id=%s attempt=%s elapsed=%ss status=%s", task_id, attempt, elapsed, status or "unknown")
                 if status in {"completed", "succeeded", "success"}:
                     return data
                 if status in {"failed", "error", "cancelled", "canceled", "timeout"}:
+                    logger.error("[Seedance API] terminal failure task_id=%s status=%s payload=%s", task_id, status, data)
                     raise RuntimeError(self._error(data, status))
                 await asyncio.sleep(self.poll_interval)
                 elapsed += self.poll_interval
