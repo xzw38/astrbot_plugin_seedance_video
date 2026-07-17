@@ -38,7 +38,7 @@ class SeedancePlugin(Star):
     async def seedance_generate_video(
         self,
         event: AstrMessageEvent,
-        prompt: str,
+        prompt: str = "",
         image_url: str = "",
         duration: int = 5,
         aspect_ratio: str = "16:9",
@@ -49,6 +49,9 @@ class SeedancePlugin(Star):
         当用户想把一张图片、自拍或其他参考图制作成视频时调用。若上一步图片工具返回了图片 URL，必须传入 image_url。prompt 写视频中的动作、镜头和画面要求。没有图片时生成文生视频。
         """
         if not isinstance(prompt, str) or not prompt.strip():
+            prompt = getattr(event, "message_str", "") or ""
+            prompt = prompt.replace("用seedence", "").replace("用seedance", "").strip(" ，,。")
+        if not prompt:
             return "缺少视频提示词，请说明想让画面中的人物或物体做什么。"
         if not self.api_key:
             return "Seedance API Key 未配置。"
@@ -62,6 +65,7 @@ class SeedancePlugin(Star):
             "generate_audio": bool(self.config.get("generate_audio", True)),
             "watermark": False,
         }
+        image_url = image_url or (self._extract_image_urls(event) or [""])[0]
         if image_url:
             input_data["image_urls"] = [image_url]
         task_id = await self._create({"model": self.config.get("model", "seedance-2-0"), "input": input_data})
