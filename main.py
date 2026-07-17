@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -94,11 +93,11 @@ class SeedancePlugin(Star):
         event: AstrMessageEvent,
         prompt: str = "",
         image_url: str = "",
-        duration: int = 5,
-        aspect_ratio: str = "16:9",
-        resolution: str = "720p",
+        duration: int | None = None,
+        aspect_ratio: str = "",
+        resolution: str = "",
         model: str = "",
-        generate_audio: bool = True,
+        generate_audio: bool | None = None,
     ) -> str:
         """调用 Seedance 生成视频。
 
@@ -108,18 +107,11 @@ class SeedancePlugin(Star):
             "[Seedance Tool] start prompt=%s image_url=%s duration=%s aspect_ratio=%s resolution=%s",
             bool(prompt), bool(image_url), duration, aspect_ratio, resolution,
         )
-        raw_message = str(getattr(event, "message_str", "") or "")
-        if duration == 5:
-            duration_match = re.search(r"(?:duration|时长)\s*[=:：]?\s*(\d+)\s*(?:秒|s)?|\b(\d+)\s*秒", raw_message, re.I)
-            if duration_match:
-                duration = int(duration_match.group(1) or duration_match.group(2))
-        if resolution == "720p":
-            resolution_match = re.search(r"\b(480p|720p|1080p|4k)\b", raw_message, re.I)
-            if resolution_match:
-                resolution = resolution_match.group(1).lower()
-        if generate_audio and re.search(r"不要音频|关闭音频|无音频|不要声音|静音", raw_message):
-            generate_audio = False
-        logger.info("[Seedance Tool] parsed message options duration=%s resolution=%s audio=%s", duration, resolution, generate_audio)
+        duration = duration if duration is not None else int(self.config.get("duration", 5))
+        aspect_ratio = aspect_ratio or str(self.config.get("aspect_ratio", "16:9"))
+        resolution = resolution or str(self.config.get("resolution", "720p"))
+        generate_audio = bool(self.config.get("generate_audio", True)) if generate_audio is None else bool(generate_audio)
+        logger.info("[Seedance Tool] effective settings duration=%s resolution=%s aspect_ratio=%s audio=%s", duration, resolution, aspect_ratio, generate_audio)
         if not isinstance(prompt, str) or not prompt.strip():
             prompt = getattr(event, "message_str", "") or ""
             prompt = prompt.replace("用seedence", "").replace("用seedance", "").strip(" ，,。")
