@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -124,8 +125,20 @@ class SeedancePlugin(Star):
             video_url = self._find_video_url(result)
             logger.info("[Seedance Background] completed task_id=%s elapsed=%.1fs video_url=%s", task_id, elapsed, bool(video_url))
             if video_url:
-                await event.send(event.chain_result([Video.fromURL(video_url)]))
-                logger.info("[Seedance Background] result sent task_id=%s", task_id)
+                local_file = await self._download_video(video_url)
+                try:
+                    if local_file:
+                        await event.send(event.chain_result([Video.fromFile(local_file)]))
+                        logger.info("[Seedance Background] local video sent task_id=%s file=%s", task_id, local_file)
+                    else:
+                        await event.send(event.chain_result([Video.fromURL(video_url)]))
+                        logger.info("[Seedance Background] remote video sent task_id=%s", task_id)
+                finally:
+                    if local_file:
+                        try:
+                            Path(local_file).unlink(missing_ok=True)
+                        except OSError:
+                            logger.warning("[Seedance Background] failed to remove temp file=%s", local_file)
             else:
                 await event.send(event.plain_result("Seedance 任务完成，但没有返回视频地址。"))
                 logger.error("[Seedance Background] completed without video URL task_id=%s payload=%s", task_id, result)
@@ -133,6 +146,25 @@ class SeedancePlugin(Star):
             logger.exception("Seedance background tool task failed")
             logger.error("[Seedance Background] failed task_id=%s error=%s", task_id, exc)
             await event.send(event.plain_result(f"Seedance 视频生成失败：{exc}"))
+
+    async def _download_video(self, video_url: str) -> str:
+        """Download the result before sending; some adapters cannot fetch CDN URLs."""
+        try:
+            timeout = aiohttp.ClientTimeout(total=120)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(video_url, headers={"User-Agent": "Mozilla/5.0"}) as response:
+                    if response.status >= 400:
+                        logger.warning("[Seedance Download] failed status=%s url=%s", response.status, video_url)
+                        return ""
+                    content = await response.read()
+            with tempfile.NamedTemporaryFile(prefix="seedance_", suffix=".mp4", delete=False) as output:
+                output.write(content)
+                path = output.name
+            logger.info("[Seedance Download] downloaded bytes=%s file=%s", len(content), path)
+            return path
+        except Exception as exc:
+            logger.warning("[Seedance Download] exception=%s url=%s", exc, video_url)
+            return ""
 
     @filter.command("seedance")
     async def generate(self, event: AstrMessageEvent):
