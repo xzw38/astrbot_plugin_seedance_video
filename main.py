@@ -148,13 +148,12 @@ class SeedancePlugin(Star):
             logger.info("[Seedance Background] completed task_id=%s elapsed=%.1fs video_url=%s", task_id, elapsed, bool(video_url))
             if video_url:
                 local_file = await self._download_video(video_url)
-                try:
-                    if local_file:
-                        await event.send(event.chain_result([Video.fromFileSystem(local_file)]))
-                        logger.info("[Seedance Background] local video sent task_id=%s file=%s", task_id, local_file)
-                    else:
-                        await event.send(event.chain_result([Video.fromURL(video_url)]))
-                        logger.info("[Seedance Background] remote video sent task_id=%s", task_id)
+                if local_file:
+                    await event.send(event.chain_result([Video.fromFileSystem(local_file)]))
+                    logger.info("[Seedance Background] local video sent task_id=%s file=%s", task_id, local_file)
+                else:
+                    await event.send(event.chain_result([Video.fromURL(video_url)]))
+                    logger.info("[Seedance Background] remote video sent task_id=%s", task_id)
             else:
                 await event.send(event.plain_result("Seedance 任务完成，但没有返回视频地址。"))
                 logger.error("[Seedance Background] completed without video URL task_id=%s payload=%s", task_id, result)
