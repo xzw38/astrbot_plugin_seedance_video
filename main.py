@@ -118,9 +118,12 @@ class SeedancePlugin(Star):
         if not prompt:
             return "缺少视频提示词，请说明想让画面中的人物或物体做什么。"
         persona_prompt = self._profile_base_prompt()
+        advanced_prompt = str(self.config.get("advanced_prompt", "")).strip()
+        character_only = bool(self.config.get("character_reference_only", True))
+        if advanced_prompt:
+            prompt = f"{advanced_prompt}\n{prompt}"
         if persona_prompt:
             prompt = f"{persona_prompt}\n动作与镜头要求：{prompt}"
-        logger.info("[Seedance Tool] final prompt=%s", prompt)
         if not self.api_key:
             return "Seedance API Key 未配置。"
         extracted_images = self._extract_image_urls(event)
@@ -128,6 +131,13 @@ class SeedancePlugin(Star):
         image_source = "tool_parameter" if image_url else ("message_or_reply" if extracted_images else ("active_persona" if profile_image else "none"))
         image_url = image_url or (extracted_images or [""])[0] or profile_image
         logger.info("[Seedance Tool] selected image=%s source=%s url=%s", bool(image_url), image_source, image_url or "-")
+        if image_url and character_only:
+            prompt = (
+                "Use the reference image only for the character identity and appearance. "
+                "Do not copy or preserve its background, setting, composition, lighting, pose, or camera angle. "
+                "Create the environment and shot entirely from the scene instructions.\n" + prompt
+            )
+        logger.info("[Seedance Tool] final prompt=%s", prompt)
         duration = min(15, max(4, int(duration)))
         input_data: dict[str, Any] = {
             "prompt": prompt,
