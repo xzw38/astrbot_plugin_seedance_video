@@ -8,6 +8,7 @@
   "generate_audio": {"type": "bool", "description": "是否默认生成音频", "default": true},
   "poll_interval": {"type": "int", "description": "任务状态轮询间隔，单位秒", "default": 5},
   "timeout": {"type": "int", "description": "单个任务最长等待时间，单位秒", "default": 900},
+  "video_retention_days": {"type": "int", "description": "本地视频缓存保留天数，默认 3 天；设为 0 表示不自动清理", "default": 3},
   "persona_config": {
     "description": "多组人设与默认参考图",
     "type": "object",

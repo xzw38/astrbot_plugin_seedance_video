@@ -22,6 +22,22 @@ class SeedancePlugin(Star):
         self.base_url = str(self.config.get("base_url", "https://api.seedance2.ai")).rstrip("/")
         self.poll_interval = max(3, int(self.config.get("poll_interval", 5)))
         self.timeout = max(60, int(self.config.get("timeout", 900)))
+        self.video_retention_days = max(0, int(self.config.get("video_retention_days", 3)))
+        self.video_cache_dir = Path(__file__).with_name("video_cache")
+        self._cleanup_video_cache()
+
+    def _cleanup_video_cache(self) -> None:
+        if self.video_retention_days <= 0:
+            return
+        try:
+            self.video_cache_dir.mkdir(parents=True, exist_ok=True)
+            cutoff = __import__("time").time() - self.video_retention_days * 86400
+            for path in self.video_cache_dir.glob("seedance_*.mp4"):
+                if path.is_file() and path.stat().st_mtime < cutoff:
+                    path.unlink(missing_ok=True)
+                    logger.info("[Seedance Cleanup] removed expired video=%s", path)
+        except Exception as exc:
+            logger.warning("[Seedance Cleanup] failed: %s", exc)
 
     def _profile_image_url(self) -> str:
         """Return the first public image URL from the active persona."""
@@ -135,12 +151,6 @@ class SeedancePlugin(Star):
                     else:
                         await event.send(event.chain_result([Video.fromURL(video_url)]))
                         logger.info("[Seedance Background] remote video sent task_id=%s", task_id)
-                finally:
-                    if local_file:
-                        try:
-                            Path(local_file).unlink(missing_ok=True)
-                        except OSError:
-                            logger.warning("[Seedance Background] failed to remove temp file=%s", local_file)
             else:
                 await event.send(event.plain_result("Seedance 任务完成，但没有返回视频地址。"))
                 logger.error("[Seedance Background] completed without video URL task_id=%s payload=%s", task_id, result)
@@ -159,7 +169,8 @@ class SeedancePlugin(Star):
                         logger.warning("[Seedance Download] failed status=%s url=%s", response.status, video_url)
                         return ""
                     content = await response.read()
-            with tempfile.NamedTemporaryFile(prefix="seedance_", suffix=".mp4", delete=False) as output:
+            self.video_cache_dir.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(prefix="seedance_", suffix=".mp4", dir=self.video_cache_dir, delete=False) as output:
                 output.write(content)
                 path = output.name
             logger.info("[Seedance Download] downloaded bytes=%s file=%s", len(content), path)
