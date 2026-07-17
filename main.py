@@ -36,15 +36,32 @@ class SeedancePlugin(Star):
                 logger.warning("[Seedance Optimizer] no active AstrBot text provider; using original prompt")
                 return prompt
             provider_id = provider.meta().id
+            motion_style = str(self.config.get("motion_style", "stable")).strip().lower()
+            motion_rule = {
+                "stable": (
+                    "优先生成稳定连续的短镜头：单一场景、单一主体、一个主要动作，镜头只做轻微平滑移动；"
+                    "禁止突然换场、跳切、瞬移、突然改变景别或复杂环绕。"
+                ),
+                "normal": (
+                    "保持单一连续场景和人物一致性，只允许一到两种自然动作和缓慢运镜；"
+                    "不要使用跳切、瞬移或突然换场。"
+                ),
+                "dynamic": (
+                    "允许较明显但连续的运镜和动作，但仍保持同一地点、同一人物和连贯时间线；"
+                    "禁止跳切、瞬移和无理由的场景切换。"
+                ),
+            }.get(motion_style, "")
             reference_rule = (
-                "If a reference image is provided, use it only for the character identity and appearance; "
-                "invent the background, setting, lighting, composition, and camera from the user request.\n"
+                "如果提供参考图，只保留人物身份、脸部特征、发型、体型和服装等外观；"
+                "忽略参考图的背景和原构图，动作与镜头以用户要求为准，但要让参考图自然过渡为视频第一帧。\n"
                 if image_url else ""
             )
             system_prompt = str(self.config.get("optimizer_system_prompt", "")).strip() or (
-                "你是专业的视频导演和提示词编剧。把用户的简短要求扩写成一段完整的视频生成提示词， "
-                "包含场景、人物动作、镜头运动、时间节奏、光线和画面风格。只输出最终提示词，不要解释过程， "
-                "不要输出 JSON，不要改变用户的核心意图。\n" + reference_rule
+                "你是专业的视频导演和提示词编剧。把用户的简短要求扩写成适合 4-15 秒 image-to-video 的完整提示词。"
+                "只输出最终提示词，不要解释过程，不要输出 JSON，不要改变用户的核心意图。"
+                "必须使用单一连续场景和连续时间线，动作数量要少，先描述主体再描述一个主要动作和轻微运镜。"
+                "不要编排多个镜头，不要写远景/中景/近景连续切换，不要写分镜表。\n"
+                + motion_rule + "\n" + reference_rule
             )
             logger.info("[Seedance Optimizer] start provider=%s image=%s raw_prompt=%s", provider_id, bool(image_url), prompt)
             result = await asyncio.wait_for(
@@ -173,9 +190,10 @@ class SeedancePlugin(Star):
         prompt = await self._optimize_prompt(prompt, image_url)
         if image_url and character_only:
             prompt = (
-                "Use the reference image only for the character identity and appearance. "
-                "Do not copy or preserve its background, setting, composition, lighting, pose, or camera angle. "
-                "Create the environment and shot entirely from the scene instructions.\n" + prompt
+                "Reference-image continuity constraints: preserve the person's identity, face, hairstyle, body shape, "
+                "and clothing. Ignore the reference background and original composition. Treat the reference as the "
+                "natural first frame, then continue with one smooth action in one continuous scene. No hard cut, no "
+                "instant relocation, no sudden scene or camera change.\n" + prompt
             )
         logger.info("[Seedance Tool] final prompt=%s", prompt)
         duration = min(15, max(4, int(duration)))
