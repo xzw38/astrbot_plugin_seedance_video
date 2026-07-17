@@ -96,6 +96,8 @@ class SeedancePlugin(Star):
         duration: int = 5,
         aspect_ratio: str = "16:9",
         resolution: str = "720p",
+        model: str = "",
+        generate_audio: bool = True,
     ) -> str:
         """调用 Seedance 生成视频。
 
@@ -124,13 +126,14 @@ class SeedancePlugin(Star):
             "duration": duration,
             "aspect_ratio": aspect_ratio,
             "resolution": resolution,
-            "generate_audio": bool(self.config.get("generate_audio", True)),
+            "generate_audio": bool(generate_audio),
             "watermark": False,
         }
         logger.info("[Seedance Tool] input mode=%s profile_image=%s", "image-to-video" if image_url else "text-to-video", bool(image_url))
         if image_url:
             input_data["image_urls"] = [image_url]
-        task_id = await self._create({"model": self.config.get("model", "seedance-2-0"), "input": input_data})
+        selected_model = model or str(self.config.get("model", "seedance-2-0"))
+        task_id = await self._create({"model": selected_model, "input": input_data})
         logger.info("[Seedance Tool] submitted task_id=%s; background polling started", task_id)
         asyncio.create_task(self._finish_tool_task(event, task_id))
         return f"Seedance 视频任务已提交，任务 ID：{task_id}。生成完成后会自动发送视频，请稍候。"

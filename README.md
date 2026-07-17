@@ -26,6 +26,10 @@ AstrBot 的 Seedance 2.0 视频生成插件。
 
 插件会自动把聊天图片作为首帧，使用提示词控制动作。若平台无法提供图片的公开 URL，可使用 `image=https://...` 手动指定公开图片地址。
 
+## 体积优化
+
+Seedance API 当前没有提供码率或编码器参数。需要较小文件时，建议把默认配置设为：`resolution=480p`、`duration=4`、`generate_audio=false`。也可以直接告诉 Bot：“生成小体积视频”，工具会按低分辨率、短时长和关闭音频处理。
+
 ## 让 Bot 自动调用
 
 插件同时注册了 LLM Tool：`seedance_generate_video`。开启 AstrBot 的工具调用后，Bot 可以先调用 omnidraw 的生图或自拍工具，再把返回的图片 URL 传给 Seedance 工具生成视频。
