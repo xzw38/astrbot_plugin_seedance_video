@@ -1,10 +1,10 @@
 [
   {
     "name": "astrbot_plugin_seedance_video",
-    "display_name": "Seedance 视频生成",
-    "desc": "Seedance 2.0 文生视频、图生视频和自拍转视频插件，支持异步任务轮询。",
+    "display_name": "Seedance Video Generation",
+    "desc": "Seedance 2.0 text-to-video, image-to-video, and async polling plugin.",
     "repo": "https://github.com/xzw38/astrbot_plugin_seedance_video",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "astrbotvideogenerate",
     "support_platforms": ["aiocqhttp", "telegram", "discord"]
   }
