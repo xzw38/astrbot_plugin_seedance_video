@@ -28,7 +28,7 @@ class SeedancePlugin(Star):
         self._cleanup_video_cache()
 
     async def _optimize_prompt(self, prompt: str, image_url: str = "") -> str:
-        if not bool(self.config.get("enable_prompt_optimizer", False)):
+        if not bool(self.config.get("enable_prompt_optimizer", True)):
             return prompt
         try:
             provider = self.context.get_using_provider()
