@@ -1,5 +1,10 @@
 # 更新日志
 
+## 1.1.15
+
+- 针对 AstrBot Docker + Windows PicGo 场景，将 PicGo 默认地址改为 `host.docker.internal:36677`。
+- 仍可在配置页改回 `127.0.0.1`，适用于 AstrBot 与 PicGo 在同一系统进程运行的场景。
+
 ## 1.1.14
 
 - 支持通过本机 PicGo Server 将 OmniDraw 的 `data:image` Base64 图片上传为公网 URL。

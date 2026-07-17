@@ -208,7 +208,7 @@ class SeedancePlugin(Star):
         if image_url.startswith("data:image/"):
             uploaded_image_url = await self._upload_data_image_with_picgo(image_url)
             if not uploaded_image_url:
-                return "OmniDraw 图片是 Base64 格式，PicGo 上传失败。请确认 PicGo Server 已启用并监听 127.0.0.1:36677。"
+                return "OmniDraw 图片是 Base64 格式，PicGo 上传失败。请确认 PicGo Server 已启用，并检查 picgo_server_url 是否能从 AstrBot 环境访问。"
             image_url = uploaded_image_url
             image_source = "picgo"
         logger.info("[Seedance Tool] selected image=%s source=%s url=%s", bool(image_url), image_source, image_url or "-")
@@ -306,7 +306,7 @@ class SeedancePlugin(Star):
             with tempfile.NamedTemporaryFile(prefix="seedance_input_", suffix=extension, dir=self.video_cache_dir, delete=False) as output:
                 output.write(content)
                 temp_path = output.name
-            endpoint = str(self.config.get("picgo_server_url", "http://127.0.0.1:36677/upload")).strip()
+            endpoint = str(self.config.get("picgo_server_url", "http://host.docker.internal:36677/upload")).strip()
             logger.info("[Seedance PicGo] uploading data image bytes=%s endpoint=%s", len(content), endpoint)
             timeout = aiohttp.ClientTimeout(total=60)
             async with aiohttp.ClientSession(timeout=timeout) as session:
