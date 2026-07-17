@@ -1,0 +1,11 @@
+{
+  "api_key": {"type": "string", "description": "Seedance API Key；正式使用建议填写在这里", "default": ""},
+  "base_url": {"type": "string", "description": "Seedance API 地址", "default": "https://api.seedance2.ai"},
+  "model": {"type": "string", "description": "模型：seedance-2-0、seedance-2-0-fast 或 seedance-2-0-mini", "default": "seedance-2-0"},
+  "duration": {"type": "int", "description": "默认视频时长，范围 4-15 秒", "default": 5},
+  "aspect_ratio": {"type": "string", "description": "画面比例：16:9、9:16、1:1、4:3、3:4、21:9 或 adaptive", "default": "16:9"},
+  "resolution": {"type": "string", "description": "默认清晰度：480p、720p、1080p 或 4k", "default": "720p"},
+  "generate_audio": {"type": "bool", "description": "是否默认生成音频", "default": true},
+  "poll_interval": {"type": "int", "description": "任务状态轮询间隔，单位秒", "default": 5},
+  "timeout": {"type": "int", "description": "单个任务最长等待时间，单位秒", "default": 900}
+}
